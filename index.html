@@ -71,7 +71,7 @@
 
         <div id="responseDetails" class="mt-4 hidden">
             <p class="text-xs text-gray-400 mb-1 uppercase tracking-wider font-bold">API Response</p>
-            <pre class="bg-gray-900 text-green-400 p-4 rounded-lg text-xs overflow-x-auto"></pre>
+            <pre class="bg-gray-900 text-green-400 p-4 rounded-lg text-xs overflow-x-auto whitespace-pre-wrap"></pre>
         </div>
     </div>
 
@@ -85,9 +85,13 @@
         const pre = responseDetails.querySelector('pre');
 
         // Note: In a production environment, you should never expose API keys on the frontend.
-        // This is for demonstration purposes as requested.
         const API_KEY = "ed21bd33ee7fd3aaa3f353e78ac35a1ff4d44f60";
-        const API_URL = "https://ap-northeast-1.recall.ai/i/api/v1/bot/";
+        
+        // IMPORTANT CORS FIX:
+        // We are using a public CORS proxy (corsproxy.io) to bypass the browser's preflight check.
+        // This allows the frontend to send the request for testing purposes.
+        const TARGET_URL = "https://ap-northeast-1.recall.ai/i/api/v1/bot/";
+        const API_URL = "https://corsproxy.io/?" + encodeURIComponent(TARGET_URL);
 
         botForm.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -112,8 +116,6 @@
             };
 
             try {
-                // IMPORTANT: Browsers typically block direct requests to external APIs (CORS).
-                // If this fails in a standard browser, you would need a small backend proxy.
                 const response = await fetch(API_URL, {
                     method: 'POST',
                     headers: {
@@ -124,18 +126,24 @@
                     body: JSON.stringify(payload)
                 });
 
-                const data = await response.json();
+                let data;
+                try {
+                    data = await response.json();
+                } catch (jsonError) {
+                    data = { message: "Failed to parse JSON response. The proxy or API might have returned an unexpected format." };
+                }
 
                 if (response.ok) {
                     showStatus('Success! The bot is being deployed.', 'success');
                     showResponse(data);
                 } else {
-                    showStatus(`Error: ${data.detail || 'Failed to launch bot'}`, 'error');
+                    showStatus(`Error: ${data.detail || response.statusText || 'Failed to launch bot'}`, 'error');
                     showResponse(data);
                 }
             } catch (error) {
                 console.error('Fetch error:', error);
-                showStatus('Network error or CORS restriction. Check console for details.', 'error');
+                showStatus('Network error or CORS proxy failed. Check console for details.', 'error');
+                showResponse({ error: error.message });
             } finally {
                 setLoading(false);
             }
